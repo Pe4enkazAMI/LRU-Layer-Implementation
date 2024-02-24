@@ -14,7 +14,7 @@ pip install jax2torch
 ## Usage:
 
 ```python
-from LRULayer import LRULayer
+from LRU import LRULayer
 
 lru = LRULayer(*args, **kwargs)
 ```
