@@ -7,8 +7,6 @@ from jax2torch import jax2torch
 
 parscan = jax.lax.associative_scan
 
-
-
 class LRULayer(nn.Module):
     def __init__(self, emb_dim, exp_factor=2, r_min=0, r_max=1, phase=6.28) -> None:
         super().__init__()
@@ -27,31 +25,35 @@ class LRULayer(nn.Module):
         self.act = nn.Tanh()
 
         self.bu_vmap = jax2torch(
-            jax.jit(lambda B, u: jnp.einsum("ij,kmi->kmj", B, u))
+                jax.jit(lambda B, u: jnp.einsum("ij,kmi->kmj", B, u))
             )
         self.y_vmap = jax2torch(
-            jax.jit(lambda C, D, x, u: jnp.einsum("ij,kmi->kmj", C, x) + D * u)
+                jax.jit(lambda C, D, x, u: jnp.einsum("ij,kmi->kmj", C, x) + D * u)
             )
-        self.parscan = jax2torch(jax.jit(lambda x: parscan(self.bin_op, x)))
+        self.parscan = jax2torch(
+                jax.jit(lambda x: parscan(self.bin_op, x))
+            )
 
-        self.B_real = nn.Parameter(torch.randn(
-                                                size=(emb_dim * exp_factor, emb_dim * exp_factor)) / ((2 * emb_dim) ** 0.5),
-                                                requires_grad=True
-                                   )
-        self.B_imag = nn.Parameter(torch.randn(
-                                                size=(emb_dim * exp_factor, emb_dim * exp_factor)) / ((2 * emb_dim * exp_factor) ** 0.5), 
-                                                requires_grad=True
-                                   )
-        self.C_real = nn.Parameter(torch.randn(
-                                                size=(emb_dim * exp_factor, emb_dim * exp_factor)) / ((emb_dim * exp_factor) ** 0.5), 
-                                   requires_grad=True
-                                   )
-        self.C_imag = nn.Parameter(torch.randn(
-                                                size=(emb_dim * exp_factor, emb_dim * exp_factor)) / ((emb_dim * exp_factor) ** 0.5), 
-                                   requires_grad=True
-                                   )
-        self.D = nn.Parameter(torch.randn(emb_dim * exp_factor), 
-                                   requires_grad=True)
+        self.B_real = nn.Parameter(
+                torch.randn(size=(emb_dim * exp_factor, emb_dim * exp_factor)) / ((2 * emb_dim) ** 0.5),
+                requires_grad=True
+            )
+        self.B_imag = nn.Parameter(
+                torch.randn(size=(emb_dim * exp_factor, emb_dim * exp_factor)) / ((2 * emb_dim * exp_factor) ** 0.5), 
+                requires_grad=True
+            )
+        self.C_real = nn.Parameter(
+                torch.randn(size=(emb_dim * exp_factor, emb_dim * exp_factor)) / ((emb_dim * exp_factor) ** 0.5), 
+                requires_grad=True
+            )
+        self.C_imag = nn.Parameter(
+                torch.randn(size=(emb_dim * exp_factor, emb_dim * exp_factor)) / ((emb_dim * exp_factor) ** 0.5), 
+                requires_grad=True
+            )
+        self.D = nn.Parameter(
+                torch.randn(emb_dim * exp_factor),
+                requires_grad=True
+            )
 
     def __init_params(self):
         u1 = np.random.random((self.emb_dim * self.exp_factor, 1))
@@ -69,7 +71,7 @@ class LRULayer(nn.Module):
         Lambda = torch.exp(-torch.exp(self.nu_log) + 1j * torch.exp(self.theta_log))
         B_norm = (self.B_real + 1j * self.B_imag) * torch.exp(self.gamma_log)
         C = self.C_real + 1j * self.C_imag
-        Lambda_elems = torch.tile(Lambda, dims=(3, x.shape[1], Lambda.shape[-1])).reshape(3, x.shape[1], self.emb_dim * self.exp_factor)
+        Lambda_elems = torch.tile(Lambda, dims=(x.shape[0], x.shape[1], Lambda.shape[-1])).reshape(x.shape[0], x.shape[1], self.emb_dim * self.exp_factor)
         Bu_elems = self.bu_vmap(B_norm, x)
         elems = (Lambda_elems, Bu_elems)
         _, inner_state = self.parscan(elems)
